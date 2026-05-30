@@ -1,0 +1,1336 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>우주 영어 단어 게임 - Space Word Explorer</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Firebase SDK (Compat 버전을 사용하여 전역 firebase 객체 참조 오류와 스크립트 에러 완벽 해결) -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #0b0b1e;
+            color: #ffffff;
+            touch-action: none;
+            overflow: hidden;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        .font-orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+        /* 우주 배경 애니메이션 */
+        .stars {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
+            z-index: -2;
+            overflow: hidden;
+        }
+        /* 커스텀 스크롤바 */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(139, 92, 246, 0.5);
+            border-radius: 10px;
+        }
+        /* 조이스틱 영역 */
+        .joystick-zone {
+            touch-action: none;
+        }
+    </style>
+</head>
+<body class="relative w-screen h-screen flex flex-col items-center justify-center">
+
+    <div class="stars" id="starContainer"></div>
+
+    <!-- MAIN CONTAINER (Mobile aspect ratio: 390x844 or scaling to screen) -->
+    <div id="gameViewport" class="relative w-full max-w-md h-full md:h-[844px] md:rounded-3xl md:shadow-2xl md:border-4 md:border-purple-900/50 bg-[#0c0c20]/90 overflow-hidden flex flex-col justify-between p-4">
+        
+        <!-- [1] 대기실 / 설정 화면 (Lobby Screen) -->
+        <div id="lobbyScreen" class="flex-1 flex flex-col justify-between py-6 z-10">
+            <div class="text-center mt-4">
+                <div class="inline-block px-3 py-1 bg-purple-900/60 rounded-full text-xs text-purple-300 font-semibold mb-2 tracking-widest uppercase font-orbitron">
+                    <i class="fa-solid fa-shuttle-space mr-1"></i> Class English Game
+                </div>
+                <h1 class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-500 font-orbitron tracking-wider">
+                    SPACE WORD
+                </h1>
+                <p class="text-sm text-gray-300 mt-1">우주선을 타고 떠나는 신나는 단어 탐험!</p>
+            </div>
+
+            <!-- 단원 및 난이도 선택 영역 -->
+            <div class="space-y-4 px-2 my-auto">
+                <!-- 1. 단원 선택 -->
+                <div class="bg-gray-900/50 p-3 rounded-xl border border-purple-900/30">
+                    <label class="block text-xs text-purple-300 font-bold mb-2">
+                        <i class="fa-solid fa-book-open mr-1"></i> 단원(학습 단어 그룹) 선택
+                    </label>
+                    <select id="chapterSelect" class="w-full bg-slate-950 border border-purple-500/30 text-white rounded-lg p-2.5 text-sm focus:outline-none focus:border-purple-500">
+                        <option value="all">전체 단원 (총 24단어)</option>
+                        <option value="ch1">1단원: 학교 생활과 소통 (12단어)</option>
+                        <option value="ch2">2단원: 일상 행동과 규칙 (12단어)</option>
+                    </select>
+                </div>
+
+                <!-- 2. 난이도 선택 -->
+                <div class="bg-gray-900/50 p-3 rounded-xl border border-purple-900/30">
+                    <label class="block text-xs text-purple-300 font-bold mb-2">
+                        <i class="fa-solid fa-bolt mr-1"></i> 게임 난이도 선택
+                    </label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button onclick="selectDifficulty('easy')" id="btn-easy" class="difficulty-btn py-3 px-2 rounded-lg text-center border-2 border-green-500 bg-green-950/40 text-green-300 text-xs font-bold transition-all">
+                            <span class="block text-sm mb-1 font-orbitron font-bold">EASY</span>
+                            <span class="text-[10px] text-gray-300 font-normal">초보 (선택형)</span>
+                        </button>
+                        <button onclick="selectDifficulty('normal')" id="btn-normal" class="difficulty-btn py-3 px-2 rounded-lg text-center border border-purple-500/30 bg-slate-900/40 text-purple-300 text-xs font-bold transition-all">
+                            <span class="block text-sm mb-1 font-orbitron font-bold">NORMAL</span>
+                            <span class="text-[10px] text-gray-400 font-normal">중수 (일부 채우기)</span>
+                        </button>
+                        <button onclick="selectDifficulty('hard')" id="btn-hard" class="difficulty-btn py-3 px-2 rounded-lg text-center border border-purple-500/30 bg-slate-900/40 text-purple-300 text-xs font-bold transition-all">
+                            <span class="block text-sm mb-1 font-orbitron font-bold">HARD</span>
+                            <span class="text-[10px] text-gray-400 font-normal">마스터 (전체 스펠)</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 단어 리스트 요약보기 버튼 -->
+                <button onclick="toggleWordList()" class="w-full text-xs text-center text-gray-400 hover:text-white underline">
+                    <i class="fa-solid fa-list mr-1"></i> 이번 게임에 출제되는 전체 단어 보기
+                </button>
+            </div>
+
+            <!-- 하단 액션 버튼들 -->
+            <div class="px-2 space-y-3">
+                <button onclick="startGame()" class="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl font-bold text-lg text-white shadow-lg shadow-purple-500/20 active:scale-95 transition-all text-center">
+                    <i class="fa-solid fa-play mr-2"></i> 우주선 출발하기 (START)
+                </button>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="openIncorrectNote()" class="py-2.5 bg-rose-950/50 border border-rose-800/40 rounded-lg text-rose-300 text-xs font-bold active:scale-95 transition-all text-center flex items-center justify-center gap-1">
+                        <i class="fa-solid fa-book mr-1"></i> 오답 복습하기 (<span id="wrongCount">0</span>)
+                    </button>
+                    <button onclick="toggleHowToPlay()" class="py-2.5 bg-slate-800/60 rounded-lg text-slate-300 text-xs font-bold active:scale-95 transition-all text-center flex items-center justify-center gap-1">
+                        <i class="fa-solid fa-circle-question mr-1"></i> 조작법 설명
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- [2] 인게임 레이아웃 (Game Canvas & Overlays) -->
+        <div id="gamePlayScreen" class="hidden flex-1 flex flex-col relative z-10 w-full h-full overflow-hidden">
+            <!-- 상단 정보 UI (목표 문제, 하트, 점수) -->
+            <div class="flex items-center justify-between bg-slate-900/80 backdrop-blur-md p-2 rounded-xl border border-purple-500/20 mt-1 z-30">
+                <div class="flex items-center gap-1.5">
+                    <div id="livesContainer" class="flex gap-0.5 text-rose-500 text-xs">
+                        <i class="fa-solid fa-heart"></i>
+                        <i class="fa-solid fa-heart"></i>
+                        <i class="fa-solid fa-heart"></i>
+                    </div>
+                </div>
+                <div class="text-center">
+                    <span id="currentProgress" class="text-xs text-purple-300 font-bold font-orbitron">Q 1/10</span>
+                </div>
+                <div class="text-right">
+                    <span class="text-[10px] text-gray-400 block leading-none font-orbitron">SCORE</span>
+                    <span id="currentScore" class="text-sm font-black text-cyan-400 font-orbitron leading-none">0000</span>
+                </div>
+            </div>
+
+            <!-- 실시간 출제 정보 보드 -->
+            <div class="bg-purple-950/60 border-b border-purple-500/30 text-center py-2 px-1 relative z-30">
+                <p class="text-[11px] text-purple-300 font-bold">★ 뜻에 알맞은 우주 파편을 맞추거나 획득하세요! ★</p>
+                <p id="currentMeaning" class="text-xl font-black text-yellow-300 mt-0.5">뜻: Loading...</p>
+            </div>
+
+            <!-- 실제 게임 플레이가 그려질 캔버스 영역 -->
+            <div class="flex-1 relative w-full overflow-hidden bg-slate-950/40" id="canvasContainer">
+                <canvas id="gameCanvas" class="absolute top-0 left-0 w-full h-full"></canvas>
+
+                <!-- 문제 입력 패널 (중수, 마스터는 단어를 맞추면 입력창이 나옵니다) -->
+                <div id="answerInputPanel" class="hidden absolute inset-0 bg-slate-950/90 backdrop-blur-sm flex flex-col justify-center items-center p-4 z-40 transition-all duration-300">
+                    <div class="w-full max-w-sm bg-gradient-to-b from-purple-900/50 to-indigo-950/80 p-5 rounded-2xl border-2 border-purple-500/50 text-center space-y-4 shadow-2xl">
+                        <span class="px-2 py-1 bg-yellow-500 text-slate-950 text-[10px] font-black rounded-md tracking-wider">🎯 TARGET LOCKED</span>
+                        <h3 id="targetMeaning" class="text-lg font-bold text-yellow-300 mt-2">뜻: 소리지르다</h3>
+                        
+                        <!-- 힌트가 주어질 텍스트 공간 -->
+                        <div class="bg-black/50 p-3 rounded-lg text-center tracking-widest text-2xl font-bold font-orbitron text-cyan-300 min-h-[48px] flex items-center justify-center">
+                            <span id="wordHint">S H _ _ T</span>
+                        </div>
+
+                        <!-- 텍스트 인풋 -->
+                        <input type="text" id="userInputText" autocomplete="off" placeholder="여기에 영어 단어를 입력하세요" 
+                               class="w-full text-center bg-slate-950 border-2 border-purple-500 text-white text-xl py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-pink-500 uppercase font-orbitron" />
+
+                        <!-- 전송 및 오답 처리 안내 -->
+                        <div class="flex gap-2">
+                            <button onclick="submitAnswer()" class="flex-1 py-3 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-xl font-bold active:scale-95 transition-all text-sm">
+                                <i class="fa-solid fa-paper-plane mr-1"></i> 전송 (ENTER)
+                            </button>
+                        </div>
+                        <p class="text-[10px] text-gray-400">대문자, 소문자 구별 없이 정답으로 인정됩니다.</p>
+                    </div>
+                </div>
+
+                <!-- 콤보 및 피드백 텍스트 팝업 레이어 -->
+                <div id="feedbackText" class="absolute pointer-events-none text-2xl font-black text-center w-full top-1/4 left-0 text-yellow-300 opacity-0 transform -translate-y-4 transition-all duration-300 z-30 font-orbitron uppercase">
+                    GREAT!
+                </div>
+            </div>
+
+            <!-- 하단 조작계 영역 (모바일용 가상 패드) -->
+            <div class="bg-slate-900/90 p-3 flex items-center justify-between gap-4 border-t border-purple-500/20 z-30">
+                <!-- 가상 조이스틱 영역 -->
+                <div class="flex items-center gap-1">
+                    <div id="joystickBase" class="relative w-28 h-28 bg-slate-800/80 rounded-full border border-purple-500/40 flex items-center justify-center joystick-zone">
+                        <div id="joystickStick" class="absolute w-10 h-10 bg-purple-500 rounded-full shadow-lg border-2 border-white transition-all duration-75 pointer-events-none"></div>
+                    </div>
+                    <span class="text-[9px] text-gray-400 rotate-90 origin-left mt-6 hidden xs:inline">DRAG SHUTTLE</span>
+                </div>
+
+                <!-- 발사 버튼 및 상태 -->
+                <div class="flex-1 flex flex-col gap-2 items-stretch">
+                    <button id="btnFire" class="h-16 bg-gradient-to-r from-pink-600 to-purple-600 rounded-2xl text-white font-black text-lg shadow-lg active:from-pink-700 active:to-purple-700 active:scale-95 transition-all flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-fire text-xl animate-pulse"></i> LASER FIRE
+                    </button>
+                    <div class="flex justify-between items-center px-1 text-[10px] text-gray-400">
+                        <span>🚀 좌우 드래그: 회피 및 이동</span>
+                        <button onclick="exitGameConfirm()" class="text-rose-400 font-bold underline"><i class="fa-solid fa-arrow-right-from-bracket mr-0.5"></i> 게임 포기</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- [3] 게임 결과 화면 (Game Over / Success Screen) -->
+        <div id="resultScreen" class="hidden flex-1 flex flex-col justify-between py-6 px-3 z-10 text-center">
+            <div class="my-auto space-y-6">
+                <div>
+                    <span id="resultBadge" class="inline-block px-4 py-1.5 bg-emerald-950/60 border border-emerald-500/30 rounded-full text-xs font-bold text-emerald-400 tracking-wider mb-3">MISSION COMPLETE</span>
+                    <h2 class="text-3xl font-black font-orbitron text-white">우주 비행 결과</h2>
+                </div>
+
+                <!-- 최종 점수 및 통계 카드 -->
+                <div class="bg-slate-900/80 border border-purple-500/30 p-5 rounded-2xl max-w-sm mx-auto space-y-4">
+                    <div>
+                        <p class="text-xs text-gray-400 font-orbitron">FINAL SCORE</p>
+                        <p id="resultScore" class="text-4xl font-black font-orbitron text-cyan-400">0</p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 border-t border-purple-500/20 pt-4 text-xs">
+                        <div class="bg-slate-950/50 p-2 rounded-lg">
+                            <span class="text-gray-400 block mb-0.5">맞힌 단어</span>
+                            <span id="statCorrect" class="font-bold text-green-400 text-sm">0 개</span>
+                        </div>
+                        <div class="bg-slate-950/50 p-2 rounded-lg">
+                            <span class="text-gray-400 block mb-0.5">틀린 단어</span>
+                            <span id="statWrong" class="font-bold text-rose-400 text-sm">0 개</span>
+                        </div>
+                    </div>
+                </div>
+
+                <p class="text-xs text-purple-300">
+                    💡 오답 노트에 저장된 영어 단어는 메인 화면에서 재도전할 수 있어요!
+                </p>
+            </div>
+
+            <!-- 액션 버튼 -->
+            <div class="space-y-2 max-w-sm mx-auto w-full">
+                <button onclick="showLobby()" class="w-full py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl font-bold text-white shadow-lg active:scale-95 transition-all">
+                    <i class="fa-solid fa-house mr-1"></i> 메인 화면으로 가기
+                </button>
+            </div>
+        </div>
+
+        <!-- [4] 오답 노트 모달 레이어 -->
+        <div id="incorrectNoteModal" class="hidden absolute inset-0 bg-slate-950/95 backdrop-blur-md z-50 flex flex-col justify-between p-4 transition-all duration-300">
+            <div class="flex items-center justify-between border-b border-purple-500/30 pb-3">
+                <h3 class="text-lg font-black text-rose-400"><i class="fa-solid fa-book-bookmark mr-1"></i> 오답 복습 연구소</h3>
+                <button onclick="closeIncorrectNote()" class="text-gray-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <!-- 오답 학습 카드 리스트 영역 -->
+            <div id="incorrectListArea" class="flex-1 overflow-y-auto py-4 space-y-3 px-1 my-2">
+                <!-- 동적으로 오답들이 들어갑니다 -->
+                <div class="text-center text-gray-400 py-12 text-sm">
+                    <i class="fa-solid fa-face-smile text-3xl mb-2 text-yellow-400 block"></i>
+                    저장된 오답이 없습니다. 완벽해요!
+                </div>
+            </div>
+
+            <!-- 오답 노트 제어 패널 -->
+            <div class="space-y-2 pt-2 border-t border-purple-500/20">
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="startIncorrectPractice()" id="btnPracticeWrong" class="py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs active:scale-95 transition-all text-center">
+                        <i class="fa-solid fa-graduation-cap mr-1"></i> 오답 모아 풀기
+                    </button>
+                    <button onclick="clearAllIncorrect()" class="py-3 bg-slate-800 text-slate-300 rounded-xl font-bold text-xs active:scale-95 transition-all text-center">
+                        <i class="fa-solid fa-trash-can mr-1"></i> 오답 모두 삭제
+                    </button>
+                </div>
+                <button onclick="closeIncorrectNote()" class="w-full py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-gray-300">
+                    닫기
+                </button>
+            </div>
+        </div>
+
+        <!-- [5] 전체 단어장 팝업 -->
+        <div id="wordListModal" class="hidden absolute inset-0 bg-slate-950/95 backdrop-blur-md z-50 flex flex-col justify-between p-4">
+            <div class="flex items-center justify-between border-b border-purple-500/30 pb-3">
+                <h3 class="text-lg font-bold text-yellow-300"><i class="fa-solid fa-stars mr-1"></i> 이번 학기 영단어 마스터클래스</h3>
+                <button onclick="toggleWordList()" class="text-gray-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto py-3 space-y-2 pr-1" id="wordListGrid">
+                <!-- 단어들이 기입됩니다 -->
+            </div>
+
+            <button onclick="toggleWordList()" class="w-full py-3 bg-purple-950 border border-purple-500/30 text-purple-300 rounded-xl font-bold mt-2">
+                확인 완료
+            </button>
+        </div>
+
+        <!-- [6] 커스텀 안내 모달 (alert 우회용) -->
+        <div id="customAlertModal" class="hidden absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+            <div class="w-full max-w-xs bg-slate-900 border-2 border-purple-500 p-5 rounded-2xl text-center space-y-4">
+                <p id="customAlertMessage" class="text-sm text-gray-200 whitespace-pre-line font-medium">안내 문구가 출력됩니다.</p>
+                <div class="flex gap-2">
+                    <button onclick="closeCustomAlert()" class="flex-1 py-2 bg-purple-600 text-white rounded-lg font-bold text-xs">확인</button>
+                    <button id="customAlertCancel" onclick="closeCustomAlert()" class="hidden flex-1 py-2 bg-slate-700 text-white rounded-lg font-bold text-xs">취소</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- [7] 플레이 조작 안내 모달 -->
+        <div id="howToPlayModal" class="hidden absolute inset-0 bg-slate-950/95 backdrop-blur-md z-50 flex flex-col justify-between p-5 text-sm text-gray-300">
+            <div class="space-y-4 my-auto">
+                <h3 class="text-xl font-black text-cyan-400 text-center"><i class="fa-solid fa-shuttle-space mr-2 animate-bounce"></i>조정석 매뉴얼</h3>
+                
+                <div class="space-y-3 bg-slate-900/60 p-4 rounded-xl border border-purple-500/20">
+                    <div class="flex items-start gap-3">
+                        <div class="bg-purple-900/50 p-2 rounded-lg text-purple-300"><i class="fa-solid fa-gamepad"></i></div>
+                        <div>
+                            <strong class="text-white text-xs block">조이스틱 비행조종</strong>
+                            <p class="text-[11px] text-gray-400">좌측 하단의 조이스틱을 자유롭게 슬라이드하여 우주선을 전방위(앞, 뒤, 좌, 우)로 움직일 수 있습니다.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-start gap-3">
+                        <div class="bg-pink-900/50 p-2 rounded-lg text-pink-300"><i class="fa-solid fa-crosshairs"></i></div>
+                        <div>
+                            <strong class="text-white text-xs block">레이저 및 타겟 충돌</strong>
+                            <p class="text-[11px] text-gray-400">타겟(운석/외계인)에 적힌 단어 혹은 한글 뜻을 보고, 우측 발사 버튼을 눌러 정답 단어를 맞춰 물리쳐야 합니다.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-start gap-3">
+                        <div class="bg-amber-900/50 p-2 rounded-lg text-amber-300"><i class="fa-solid fa-sliders"></i></div>
+                        <div>
+                            <strong class="text-white text-xs block">선택형 vs 스펠링 난이도</strong>
+                            <p class="text-[11px] text-gray-400"><b>초보</b>: 객관식 보기가 적힌 운석 중 정답을 맞추세요.<br><b>중수/마스터</b>: 타겟을 타격한 뒤 영타 입력창에 알맞은 알파벳 정답을 입력하세요.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <button onclick="toggleHowToPlay()" class="w-full py-3 bg-purple-600 text-white rounded-xl font-bold">비행 시동 걸기</button>
+        </div>
+
+    </div>
+
+    <!-- Firebase 및 로컬 스토리지 데이터 관리 로직 & 게임 플레이 구현 -->
+    <script>
+        // ----------------------------------------------------
+        // 데이터 정의 (구글 시트 연동을 모사한 단어 리스트)
+        // ----------------------------------------------------
+        const WORD_DATABASE = [
+            // 1단원: 학교 생활과 소통
+            { id: 1, chapter: "ch1", word: "shout", meaning: "외치다, 소리지르다" },
+            { id: 2, chapter: "ch1", word: "frown", meaning: "얼굴을 찡그리다" },
+            { id: 3, chapter: "ch1", word: "trash", meaning: "쓰레기 통, 쓰레기" },
+            { id: 4, chapter: "ch1", word: "class", meaning: "학급, 반" },
+            { id: 5, chapter: "ch1", word: "meeting", meaning: "회의, 모임" },
+            { id: 6, chapter: "ch1", word: "gather", meaning: "모이다" },
+            { id: 7, chapter: "ch1", word: "raise", meaning: "들어 올리다" },
+            { id: 8, chapter: "ch1", word: "noise", meaning: "시끄러운, 떠들썩한" },
+            { id: 9, chapter: "ch1", word: "forget", meaning: "잊다, 잊어버리다" },
+            { id: 10, chapter: "ch1", word: "manners", meaning: "예의, 예절" },
+            { id: 11, chapter: "ch1", word: "respect", meaning: "존경하다, 존중하다" },
+            { id: 12, chapter: "ch1", word: "others", meaning: "남, 다른 사람들" },
+            { id: 13, chapter: "ch2", word: "poster", meaning: "벽보, 포스터" }
+            { id: 14, chapter: "ch2", word: "Miss", meaning: "결혼하지 않은 여자에 대한 정중한 호칭" }
+            { id: 15, chapter: "ch2", word: "footprint", meaning: "발자국" }
+
+            // 2단원: 일상 행동과 규칙
+            { id: 16, chapter: "ch2", word: "no more", meaning: "더 이상 ~않다" },
+            { id: 17, chapter: "ch2", word: "time for", meaning: "...하기 위한 시간" },
+            { id: 18, chapter: "ch2", word: "without", meaning: "... 없이" },
+            { id: 19, chapter: "ch2", word: "may", meaning: "... 일지도 모른다" },
+            { id: 20, chapter: "ch2", word: "next", meaning: "다음으로, 다음의" },
+            { id: 21, chapter: "ch2", word: "poke", meaning: "찌르다, 쑤시다" },
+            { id: 22, chapter: "ch2", word: "went up", meaning: "올라갔다" },
+            { id: 23, chapter: "ch2", word: "stay", meaning: "...한 상태로 유지하다" },
+            { id: 24, chapter: "ch2", word: "down", meaning: "아래로, 아래쪽으로" },
+            { id: 25, chapter: "ch2", word: "groan", meaning: "신음하다, 끙끙거리다" },
+            { id: 26, chapter: "ch2", word: "lose", meaning: "경기에서 지다" },
+            { id: 27, chapter: "ch2", word: "have fun", meaning: "즐거운 시간을 보내다" }
+            { id: 28, chapter: "ch2", word: "rule", meaning: "규칙, 규정" }
+            { id: 29, chapter: "ch2", word: "point", meaning: "물건, 방향등을 가리키다" }
+            { id: 30, chapter: "ch2", word: "cover", meaning: "덮다. 가리다. 감추다" }
+        ];
+
+        // ----------------------------------------------------
+        // 전역 상태 변수들
+        // ----------------------------------------------------
+        let selectedChapter = 'all'; // 'all', 'ch1', 'ch2'
+        let selectedDifficulty = 'easy'; // 'easy', 'normal', 'hard'
+        let incorrectWords = []; // 오답 기록 배열
+        let isIncorrectPracticeMode = false; // 오답 모드 작동 여부
+        
+        let gameScore = 0;
+        let gameLives = 3;
+        let gameIndex = 0; // 몇 번째 문제인가
+        let currentProblemWord = null; // 현재 출제된 타겟 단어 객체
+        let problemList = []; // 출제할 문제 배열
+        
+        // 인게임 렌더링 엔진 관련
+        let canvas, ctx;
+        let animationFrameId = null;
+        let starBackgrounds = [];
+        let shuttle = { x: 0, y: 0, targetX: 0, targetY: 0, width: 50, height: 50, speed: 6 };
+        let laserProjectiles = [];
+        let targets = []; // 우주 괴물, 운석들
+        let particleExplosions = [];
+        let gameActive = false;
+        
+        // 조이스틱 상태
+        let joystickActive = false;
+        let joystickCenter = { x: 0, y: 0 };
+        let joystickCurrent = { x: 0, y: 0 };
+        const maxJoystickDist = 45; // 최대 반경
+
+        // Firebase 설정 (환경변수 대응 및 오프라인 대체 제공)
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'space-english-elementary';
+        let db = null;
+        let auth = null;
+        let user = null;
+
+        // ----------------------------------------------------
+        // 초기화 로드
+        // ----------------------------------------------------
+        window.onload = function() {
+            initStarsBg();
+            setupCanvas();
+            loadIncorrectNotes();
+            registerDomEvents();
+            renderWordListGrid();
+            
+            // Firebase 초기화 시도
+            try {
+                if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+                    const firebaseConfig = JSON.parse(__firebase_config);
+                    const app = firebase.initializeApp(firebaseConfig);
+                    auth = firebase.auth(app);
+                    db = firebase.firestore(app);
+                    
+                    const initAuth = async () => {
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await firebase.auth().signInWithCustomToken(__initial_auth_token);
+                        } else {
+                            await firebase.auth().signInAnonymously();
+                        }
+                    };
+                    initAuth();
+                    
+                    firebase.auth().onAuthStateChanged((usr) => {
+                        user = usr;
+                        if (user) {
+                            syncWithFirestore();
+                        }
+                    });
+                }
+            } catch (err) {
+                console.warn("Firebase 미설정 혹은 로컬 단독 실행 중입니다. 로컬 스토리지로 완벽 동작합니다.", err);
+            }
+        };
+
+        // ----------------------------------------------------
+        // 우주 배경 생성기
+        // ----------------------------------------------------
+        function initStarsBg() {
+            const container = document.getElementById('starContainer');
+            container.innerHTML = '';
+            for (let i = 0; i < 60; i++) {
+                const star = document.createElement('div');
+                star.className = 'absolute bg-white rounded-full';
+                const size = Math.random() * 2 + 1;
+                star.style.width = size + 'px';
+                star.style.height = size + 'px';
+                star.style.top = Math.random() * 100 + '%';
+                star.style.left = Math.random() * 100 + '%';
+                star.style.opacity = Math.random() * 0.7 + 0.3;
+                container.appendChild(star);
+            }
+        }
+
+        // ----------------------------------------------------
+        // 오답 저장소 연결 (Firestore / Local Storage 교차)
+        // ----------------------------------------------------
+        function loadIncorrectNotes() {
+            const localData = localStorage.getItem('space_incorrect_v1');
+            if (localData) {
+                incorrectWords = JSON.parse(localData);
+            } else {
+                incorrectWords = [];
+            }
+            updateWrongCountUi();
+        }
+
+        function saveIncorrectNotesLocally() {
+            localStorage.setItem('space_incorrect_v1', JSON.stringify(incorrectWords));
+            updateWrongCountUi();
+            
+            // Firestore 연동
+            if (db && user) {
+                try {
+                    const path = `artifacts/${appId}/users/${user.uid}/incorrectData`;
+                    firebase.firestore().collection(path).doc('history').set({
+                        words: incorrectWords,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }).catch(err => console.error("Firestore 저장 실패:", err));
+                } catch(e) {
+                    console.error(e);
+                }
+            }
+        }
+
+        function syncWithFirestore() {
+            if (!db || !user) return;
+            const path = `artifacts/${appId}/users/${user.uid}/incorrectData`;
+            firebase.firestore().collection(path).doc('history').get()
+                .then((doc) => {
+                    if (doc.exists) {
+                        const cloudWords = doc.data().words || [];
+                        // 로컬과 합친 뒤 고유화
+                        const merged = [...incorrectWords, ...cloudWords];
+                        const uniqueMap = new Map();
+                        merged.forEach(item => uniqueMap.set(item.id, item));
+                        incorrectWords = Array.from(uniqueMap.values());
+                        saveIncorrectNotesLocally();
+                    }
+                }).catch(err => {
+                    console.log("Firestore 동기화 중 오류가 발생했습니다. 로컬 데이터를 유지합니다.", err);
+                });
+        }
+
+        function updateWrongCountUi() {
+            document.getElementById('wrongCount').innerText = incorrectWords.length;
+        }
+
+        // ----------------------------------------------------
+        // 돔 이벤트 등록 & 가상 컨트롤러 바인딩
+        // ----------------------------------------------------
+        function registerDomEvents() {
+            // 반응형 리사이즈 대응
+            window.addEventListener('resize', setupCanvas);
+
+            // 가상 조이스틱 이벤트 리스너
+            const joyBase = document.getElementById('joystickBase');
+            const joyStick = document.getElementById('joystickStick');
+
+            const handleStart = (e) => {
+                const touch = e.touches ? e.touches[0] : e;
+                const rect = joyBase.getBoundingClientRect();
+                joystickCenter = {
+                    x: rect.left + rect.width / 2,
+                    y: rect.top + rect.height / 2
+                };
+                joystickActive = true;
+                handleMove(e);
+            };
+
+            const handleMove = (e) => {
+                if (!joystickActive) return;
+                const touch = e.touches ? e.touches[0] : e;
+                
+                let deltaX = touch.clientX - joystickCenter.x;
+                let deltaY = touch.clientY - joystickCenter.y;
+                let distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+                if (distance > maxJoystickDist) {
+                    deltaX = (deltaX / distance) * maxJoystickDist;
+                    deltaY = (deltaY / distance) * maxJoystickDist;
+                    distance = maxJoystickDist;
+                }
+
+                joyStick.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+                
+                // 조이스틱 비율 계산 (-1.0 ~ 1.0)
+                joystickCurrent = {
+                    x: deltaX / maxJoystickDist,
+                    y: joystickCurrent.y // Y축은 개별 반영하거나 유지
+                };
+                // 상하 이동 감도를 조이스틱 가치에 대입
+                joystickCurrent.y = deltaY / maxJoystickDist;
+            };
+
+            const handleEnd = () => {
+                joystickActive = false;
+                joyStick.style.transform = 'translate(0px, 0px)';
+                joystickCurrent = { x: 0, y: 0 };
+            };
+
+            joyBase.addEventListener('mousedown', handleStart);
+            document.addEventListener('mousemove', handleMove);
+            document.addEventListener('mouseup', handleEnd);
+
+            joyBase.addEventListener('touchstart', handleStart, { passive: false });
+            document.addEventListener('touchmove', handleMove, { passive: false });
+            document.addEventListener('touchend', handleEnd, { passive: false });
+
+            // 레이저 버튼 누를 때 발사 트리거
+            const btnFire = document.getElementById('btnFire');
+            btnFire.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                fireLaser();
+            });
+            btnFire.addEventListener('mousedown', (e) => {
+                fireLaser();
+            });
+
+            // 키보드 조작 대응 (PC 환경 테스트용 지원)
+            window.addEventListener('keydown', (e) => {
+                if (e.code === 'Space') {
+                    fireLaser();
+                }
+                // 인풋창에 포커스가 없을 경우 방향키 조종 가능
+                if (document.activeElement.tagName !== 'INPUT' && gameActive) {
+                    if (e.key === 'ArrowLeft') joystickCurrent.x = -1;
+                    if (e.key === 'ArrowRight') joystickCurrent.x = 1;
+                    if (e.key === 'ArrowUp') joystickCurrent.y = -1;
+                    if (e.key === 'ArrowDown') joystickCurrent.y = 1;
+                }
+                if (e.key === 'Enter') {
+                    const inputPanel = document.getElementById('answerInputPanel');
+                    if (!inputPanel.classList.contains('hidden')) {
+                        submitAnswer();
+                    }
+                }
+            });
+            window.addEventListener('keyup', (e) => {
+                if (document.activeElement.tagName !== 'INPUT') {
+                    if (['ArrowLeft', 'ArrowRight'].includes(e.key)) joystickCurrent.x = 0;
+                    if (['ArrowUp', 'ArrowDown'].includes(e.key)) joystickCurrent.y = 0;
+                }
+            });
+        }
+
+        // ----------------------------------------------------
+        // UI 조작 제어
+        // ----------------------------------------------------
+        function selectDifficulty(diff) {
+            selectedDifficulty = diff;
+            document.querySelectorAll('.difficulty-btn').forEach(btn => {
+                btn.className = "difficulty-btn py-3 px-2 rounded-lg text-center border border-purple-500/30 bg-slate-900/40 text-purple-400 text-xs font-bold transition-all";
+            });
+            
+            const selectedBtn = document.getElementById(`btn-${diff}`);
+            if (diff === 'easy') {
+                selectedBtn.className = "difficulty-btn py-3 px-2 rounded-lg text-center border-2 border-green-500 bg-green-950/40 text-green-300 text-xs font-bold transition-all";
+            } else if (diff === 'normal') {
+                selectedBtn.className = "difficulty-btn py-3 px-2 rounded-lg text-center border-2 border-purple-500 bg-purple-950/40 text-purple-300 text-xs font-bold transition-all";
+            } else {
+                selectedBtn.className = "difficulty-btn py-3 px-2 rounded-lg text-center border-2 border-pink-500 bg-pink-950/40 text-pink-300 text-xs font-bold transition-all";
+            }
+        }
+
+        // 전체 단어장 목록 렌더링
+        function renderWordListGrid() {
+            const grid = document.getElementById('wordListGrid');
+            grid.innerHTML = '';
+            
+            WORD_DATABASE.forEach(item => {
+                const card = document.createElement('div');
+                card.className = "p-2.5 bg-slate-900/80 rounded-lg border border-purple-900/30 flex items-center justify-between text-xs";
+                card.innerHTML = `
+                    <div>
+                        <span class="px-1.5 py-0.5 bg-purple-950 border border-purple-500/30 text-[9px] text-purple-300 rounded mr-1.5">
+                            ${item.chapter === 'ch1' ? '1단원' : '2단원'}
+                        </span>
+                        <span class="font-bold text-white uppercase tracking-wider font-orbitron">${item.word}</span>
+                    </div>
+                    <span class="text-gray-300">${item.meaning}</span>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function toggleWordList() {
+            const modal = document.getElementById('wordListModal');
+            modal.classList.toggle('hidden');
+        }
+
+        function toggleHowToPlay() {
+            const modal = document.getElementById('howToPlayModal');
+            modal.classList.toggle('hidden');
+        }
+
+        // ----------------------------------------------------
+        // 게임 모드 시작 설정
+        // ----------------------------------------------------
+        function startGame() {
+            isIncorrectPracticeMode = false;
+            
+            // 선택된 단원 필터링
+            selectedChapter = document.getElementById('chapterSelect').value;
+            let targetWords = [];
+            if (selectedChapter === 'all') {
+                targetWords = [...WORD_DATABASE];
+            } else {
+                targetWords = WORD_DATABASE.filter(w => w.chapter === selectedChapter);
+            }
+
+            // 문제 무작위 셔플 (10개 출제하도록 구성, 10개 미만이면 가진 것만큼)
+            targetWords.sort(() => Math.random() - 0.5);
+            problemList = targetWords.slice(0, Math.min(10, targetWords.length));
+            
+            if (problemList.length === 0) {
+                showCustomAlert("해당 단원에 풀 수 있는 단어가 존재하지 않습니다.");
+                return;
+            }
+
+            initGameSession();
+        }
+
+        // 오답 복습 풀기 시작
+        function startIncorrectPractice() {
+            if (incorrectWords.length === 0) {
+                showCustomAlert("복습할 오답이 아직 존재하지 않습니다!");
+                return;
+            }
+            isIncorrectPracticeMode = true;
+            problemList = [...incorrectWords].sort(() => Math.random() - 0.5).slice(0, 10);
+            
+            closeIncorrectNote();
+            initGameSession();
+        }
+
+        function initGameSession() {
+            gameScore = 0;
+            gameLives = 3;
+            gameIndex = 0;
+            
+            document.getElementById('lobbyScreen').classList.add('hidden');
+            document.getElementById('resultScreen').classList.add('hidden');
+            document.getElementById('gamePlayScreen').classList.remove('hidden');
+            
+            setupCanvas();
+            gameActive = true;
+            shuttle.x = canvas.width / 2;
+            shuttle.y = canvas.height * 0.75;
+            shuttle.targetX = shuttle.x;
+            shuttle.targetY = shuttle.y;
+            
+            laserProjectiles = [];
+            targets = [];
+            particleExplosions = [];
+
+            nextProblem();
+            
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            gameLoop();
+        }
+
+        // ----------------------------------------------------
+        // 인게임 스테이지 출제 제어
+        // ----------------------------------------------------
+        function nextProblem() {
+            if (gameIndex >= problemList.length) {
+                endGame(true);
+                return;
+            }
+
+            currentProblemWord = problemList[gameIndex];
+            
+            // UI 정보판 갱신
+            document.getElementById('currentProgress').innerText = `Q ${gameIndex + 1}/${problemList.length}`;
+            document.getElementById('currentMeaning').innerText = `뜻: ${currentProblemWord.meaning}`;
+            document.getElementById('currentScore').innerText = String(gameScore).padStart(4, '0');
+            updateLivesUi();
+
+            // 이전 타겟 폐기 후 새로 채워넣기
+            targets = [];
+            
+            const currentWordStr = currentProblemWord.word;
+
+            if (selectedDifficulty === 'easy') {
+                // 초보: 3개의 보기 선택형 (직접 충돌하거나 미사일로 폭파)
+                const options = [currentProblemWord.word];
+                // 오답 풀 선별
+                const wrongPool = WORD_DATABASE.filter(w => w.word !== currentWordStr);
+                wrongPool.sort(() => Math.random() - 0.5);
+                options.push(wrongPool[0].word);
+                options.push(wrongPool[1].word);
+                
+                // 보기 셔플
+                options.sort(() => Math.random() - 0.5);
+
+                // 화면 상단에 3개의 운석 배치
+                const gap = canvas.width / 4;
+                options.forEach((optText, i) => {
+                    const posX = gap * (i + 1);
+                    const posY = -50 - (Math.random() * 50);
+                    targets.push({
+                        x: posX,
+                        y: posY,
+                        radius: 32,
+                        text: optText,
+                        isCorrect: optText.toLowerCase().trim() === currentWordStr.toLowerCase().trim(),
+                        speedY: 0.4 + Math.random() * 0.4,
+                        color: `hsl(${(i * 120 + 200) % 360}, 75%, 65%)`
+                    });
+                });
+            } else {
+                // 중수 또는 마스터: 정답 운석 1개, 오답 가짜 방해물 2개 생성
+                // 타격 성공 시 영타 입력기 팝업
+                const optTexts = [currentWordStr, "fake_star_x", "cosmic_dust_y"];
+                optTexts.sort(() => Math.random() - 0.5);
+                
+                const gap = canvas.width / 4;
+                optTexts.forEach((text, i) => {
+                    const posX = gap * (i + 1);
+                    const posY = -50 - (Math.random() * 60);
+                    const isCore = text === currentWordStr;
+                    targets.push({
+                        x: posX,
+                        y: posY,
+                        radius: 30,
+                        text: isCore ? "🔥 TARGET" : "☄️ DEBRIS",
+                        wordRef: currentWordStr,
+                        isCorrect: isCore,
+                        speedY: 0.5 + Math.random() * 0.3,
+                        color: isCore ? '#ef4444' : '#6b7280'
+                    });
+                });
+            }
+        }
+
+        // 하트 생명력 업데이트
+        function updateLivesUi() {
+            const container = document.getElementById('livesContainer');
+            container.innerHTML = '';
+            for (let i = 0; i < 3; i++) {
+                const heart = document.createElement('i');
+                if (i < gameLives) {
+                    heart.className = 'fa-solid fa-heart text-rose-500 animate-pulse';
+                } else {
+                    heart.className = 'fa-regular fa-heart text-gray-600';
+                }
+                container.appendChild(heart);
+            }
+        }
+
+        // ----------------------------------------------------
+        // 피드백 텍스트 효과 출력
+        // ----------------------------------------------------
+        function showFeedback(text, isGreen = true) {
+            const fb = document.getElementById('feedbackText');
+            fb.innerText = text;
+            fb.className = `absolute pointer-events-none text-3xl font-black text-center w-full top-1/4 left-0 transform transition-all duration-300 z-30 font-orbitron uppercase ${isGreen ? 'text-green-400' : 'text-rose-500'}`;
+            fb.style.opacity = '1';
+            fb.style.transform = 'translateY(0px)';
+
+            setTimeout(() => {
+                fb.style.opacity = '0';
+                fb.style.transform = 'translateY(-15px)';
+            }, 1000);
+        }
+
+        // ----------------------------------------------------
+        // 게임 캔버스 기본 설정 및 2D 컨텍스트 획득
+        // ----------------------------------------------------
+        function setupCanvas() {
+            canvas = document.getElementById('gameCanvas');
+            const container = document.getElementById('canvasContainer');
+            if (canvas && container) {
+                canvas.width = container.clientWidth;
+                canvas.height = container.clientHeight;
+                ctx = canvas.getContext('2d'); // 컨텍스트 획득 누락 문제 완전 해결!
+            }
+        }
+
+        // ----------------------------------------------------
+        // 슈팅 및 이동 물리 엔진
+        // ----------------------------------------------------
+        function fireLaser() {
+            if (!gameActive || document.getElementById('answerInputPanel').classList.contains('hidden') === false) return;
+            // 레이저 생성
+            laserProjectiles.push({
+                x: shuttle.x,
+                y: shuttle.y - 15,
+                speedY: -9,
+                width: 4,
+                height: 15
+            });
+        }
+
+        // ----------------------------------------------------
+        // 메인 프레임 루프 (렌더링 & 시뮬레이션)
+        // ----------------------------------------------------
+        function gameLoop() {
+            if (!gameActive || !ctx) return;
+
+            // 1. 그리기 초기화
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 2. 우주선 위치 계산 (조이스틱 가속도 적용)
+            if (joystickActive) {
+                shuttle.x += joystickCurrent.x * shuttle.speed;
+                shuttle.y += joystickCurrent.y * shuttle.speed;
+            }
+
+            // 우주선 벽 충돌 방지 구속조건
+            if (shuttle.x < 25) shuttle.x = 25;
+            if (shuttle.x > canvas.width - 25) shuttle.x = canvas.width - 25;
+            if (shuttle.y < 35) shuttle.y = 35;
+            if (shuttle.y > canvas.height - 35) shuttle.y = canvas.height - 35;
+
+            // 3. 우주선 그리기 (귀여운 공상과학 함선 렌더링)
+            drawSpaceShuttle(shuttle.x, shuttle.y);
+
+            // 4. 레이저 이동 및 그리기
+            for (let i = laserProjectiles.length - 1; i >= 0; i--) {
+                const laser = laserProjectiles[i];
+                laser.y += laser.speedY;
+
+                ctx.fillStyle = '#ff007f';
+                ctx.shadowColor = '#ff007f';
+                ctx.shadowBlur = 8;
+                ctx.fillRect(laser.x - laser.width/2, laser.y, laser.width, laser.height);
+                ctx.shadowBlur = 0; // 초기화
+
+                // 천장 돌파 시 소멸
+                if (laser.y < 0) {
+                    laserProjectiles.splice(i, 1);
+                }
+            }
+
+            // 5. 운석 / 외계인 타겟 이동 및 그리기
+            for (let i = targets.length - 1; i >= 0; i--) {
+                const t = targets[i];
+                t.y += t.speedY;
+
+                // 타겟 외관 그리기 (발광 이펙트)
+                ctx.beginPath();
+                ctx.arc(t.x, t.y, t.radius, 0, Math.PI * 2);
+                ctx.fillStyle = t.color;
+                ctx.shadowColor = t.color;
+                ctx.shadowBlur = 10;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+
+                // 운석 무늬 추가
+                ctx.fillStyle = 'rgba(0,0,0,0.15)';
+                ctx.beginPath();
+                ctx.arc(t.x - 6, t.y - 6, 6, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 영어 보기 또는 핵심 마크 텍스트 그리기
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 12px Orbitron, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                const textOutput = t.text.toUpperCase();
+                ctx.fillText(textOutput, t.x, t.y);
+
+                // 바닥 영역 탈출 시 하단 재등장 시킴 (루프형 우주공간 느낌 선사)
+                if (t.y - t.radius > canvas.height) {
+                    t.y = -50;
+                    t.x = Math.random() * (canvas.width - 60) + 30;
+                }
+
+                // 우주선과 운석 간 물리적 충돌 판정 (초등학생이 몸으로 부딪쳐도 정답/오답 판단 가능케 지원!)
+                const distToShuttle = Math.hypot(shuttle.x - t.x, shuttle.y - t.y);
+                if (distToShuttle < t.radius + 20) {
+                    handleTargetTrigger(t, i);
+                    break;
+                }
+
+                // 레이저와 타겟 충돌 판정
+                for (let j = laserProjectiles.length - 1; j >= 0; j--) {
+                    const l = laserProjectiles[j];
+                    const distToLaser = Math.hypot(l.x - t.x, l.y - t.y);
+                    if (distToLaser < t.radius + 3) {
+                        // 레이저 소멸 및 가상 폭발 가동
+                        createExplosion(t.x, t.y, t.color);
+                        laserProjectiles.splice(j, 1);
+                        handleTargetTrigger(t, i);
+                        break;
+                    }
+                }
+            }
+
+            // 6. 파티클 이펙트 그리기 및 제거
+            for (let i = particleExplosions.length - 1; i >= 0; i--) {
+                const p = particleExplosions[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.alpha -= 0.03;
+
+                ctx.save();
+                ctx.globalAlpha = p.alpha;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+                ctx.fill();
+                ctx.restore();
+
+                if (p.alpha <= 0) {
+                    particleExplosions.splice(i, 1);
+                }
+            }
+
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        // 우주선 그리기 헬퍼 함수
+        function drawSpaceShuttle(x, y) {
+            ctx.save();
+            // 엔진 불꽃 이펙트
+            const fireHeight = 10 + Math.random() * 8;
+            ctx.beginPath();
+            ctx.moveTo(x - 8, y + 15);
+            ctx.lineTo(x, y + 15 + fireHeight);
+            ctx.lineTo(x + 8, y + 15);
+            ctx.closePath();
+            ctx.fillStyle = '#ff8c00';
+            ctx.fill();
+
+            // 주 날개 및 선체
+            ctx.beginPath();
+            ctx.moveTo(x, y - 20); // 머리
+            ctx.lineTo(x - 20, y + 15); // 좌현 끝
+            ctx.lineTo(x - 8, y + 8); // 좌현 굴곡
+            ctx.lineTo(x + 8, y + 8); // 우현 굴곡
+            ctx.lineTo(x + 20, y + 15); // 우현 끝
+            ctx.closePath();
+
+            // 함선 그라디언트 칠하기
+            const gradient = ctx.createLinearGradient(x - 20, y, x + 20, y);
+            gradient.addColorStop(0, '#8b5cf6');
+            gradient.addColorStop(0.5, '#ec4899');
+            gradient.addColorStop(1, '#8b5cf6');
+            ctx.fillStyle = gradient;
+            ctx.fill();
+
+            // 캐노피 조종석 글래스
+            ctx.beginPath();
+            ctx.arc(x, y - 4, 5, 0, Math.PI * 2);
+            ctx.fillStyle = '#06b6d4';
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        // 폭발 이펙트 생성기
+        function createExplosion(x, y, color) {
+            for (let i = 0; i < 15; i++) {
+                particleExplosions.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 6,
+                    vy: (Math.random() - 0.5) * 6,
+                    size: Math.random() * 3 + 2,
+                    color: color,
+                    alpha: 1.0
+                });
+            }
+        }
+
+        // ----------------------------------------------------
+        // 타겟 타격 또는 충돌 시 핵심 이벤트 핸들러
+        // ----------------------------------------------------
+        function handleTargetTrigger(target, targetIndex) {
+            if (!document.getElementById('answerInputPanel').classList.contains('hidden')) return;
+
+            // EASY(초보) 난이도의 경우 몸으로 부딪히거나 총쏘면 즉시 정답 판정
+            if (selectedDifficulty === 'easy') {
+                createExplosion(target.x, target.y, target.color);
+                targets.splice(targetIndex, 1);
+
+                if (target.isCorrect) {
+                    processCorrectAnswer();
+                } else {
+                    processWrongAnswer();
+                }
+            } 
+            // 중수(Normal) & 마스터(Hard) 난이도: 정답 타겟(TARGET)을 맞혔을 때 퀴즈 입력 모달 소환
+            else {
+                if (target.isCorrect) {
+                    createExplosion(target.x, target.y, target.color);
+                    targets.splice(targetIndex, 1);
+                    openTextAnswerPanel();
+                } else {
+                    // 가짜 우주 파편을 맞힌 경우 가벼운 경고음 및 우주선 흔들림만 발생시키고 진행
+                    createExplosion(target.x, target.y, '#ffffff');
+                    targets.splice(targetIndex, 1);
+                    showFeedback("☄️ DEBRIS!", false);
+                }
+            }
+        }
+
+        // ----------------------------------------------------
+        // [중수/마스터] 텍스트 입력창 호출
+        // ----------------------------------------------------
+        function openTextAnswerPanel() {
+            const panel = document.getElementById('answerInputPanel');
+            const targetMeaning = document.getElementById('targetMeaning');
+            const wordHint = document.getElementById('wordHint');
+            const inputField = document.getElementById('userInputText');
+
+            targetMeaning.innerText = `뜻: ${currentProblemWord.meaning}`;
+            inputField.value = '';
+            
+            const rawWord = currentProblemWord.word; // 예: "shout" / "no more"
+
+            // 난이도별 힌트 구성
+            if (selectedDifficulty === 'normal') {
+                // 중수: 일부분의 스펠링 보여주기 (절반은 _ 처리)
+                let hinted = "";
+                for (let i = 0; i < rawWord.length; i++) {
+                    const char = rawWord[i];
+                    if (char === ' ') {
+                        hinted += "  "; // 띄어쓰기는 공백 유지
+                    } else if (i % 2 === 1) {
+                        hinted += "_ ";
+                    } else {
+                        hinted += char.toUpperCase() + " ";
+                    }
+                }
+                wordHint.innerText = hinted.trim();
+            } else {
+                // 마스터: 힌트 없이 스펠링 글자수만큼 _ 표시
+                let hinted = "";
+                for (let i = 0; i < rawWord.length; i++) {
+                    const char = rawWord[i];
+                    if (char === ' ') {
+                        hinted += "  ";
+                    } else {
+                        hinted += "_ ";
+                    }
+                }
+                wordHint.innerText = hinted.trim() + ` (${rawWord.length}글자)`;
+            }
+
+            panel.classList.remove('hidden');
+            setTimeout(() => inputField.focus(), 150);
+        }
+
+        // ----------------------------------------------------
+        // 주관식 정답 검증 처리
+        // ----------------------------------------------------
+        function submitAnswer() {
+            const inputVal = document.getElementById('userInputText').value.trim().toLowerCase();
+            const correctVal = currentProblemWord.word.toLowerCase().trim();
+
+            document.getElementById('answerInputPanel').classList.add('hidden');
+
+            if (inputVal === correctVal) {
+                processCorrectAnswer();
+            } else {
+                processWrongAnswer();
+            }
+        }
+
+        // 정답을 맞춤
+        function processCorrectAnswer() {
+            gameScore += 100;
+            showFeedback("CORRECT! +100");
+            
+            gameIndex++;
+            setTimeout(nextProblem, 800);
+        }
+
+        // 오답 처리
+        function processWrongAnswer() {
+            gameLives--;
+            showFeedback("WRONG! -1 LIFE", false);
+            updateLivesUi();
+
+            const isExist = incorrectWords.some(w => w.id === currentProblemWord.id);
+            if (!isExist) {
+                incorrectWords.push(currentProblemWord);
+                saveIncorrectNotesLocally();
+            }
+
+            if (gameLives <= 0) {
+                endGame(false);
+            } else {
+                gameIndex++;
+                setTimeout(nextProblem, 1000);
+            }
+        }
+
+        // ----------------------------------------------------
+        // 게임 오버 / 미션 클리어 종료
+        // ----------------------------------------------------
+        function endGame(isSuccess) {
+            gameActive = false;
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+
+            document.getElementById('gamePlayScreen').classList.add('hidden');
+            document.getElementById('resultScreen').classList.remove('hidden');
+
+            const badge = document.getElementById('resultBadge');
+            const scoreDisp = document.getElementById('resultScore');
+            const statCorrect = document.getElementById('statCorrect');
+            const statWrong = document.getElementById('statWrong');
+
+            if (isSuccess) {
+                badge.className = "inline-block px-4 py-1.5 bg-emerald-950/60 border border-emerald-500/30 rounded-full text-xs font-bold text-emerald-400 tracking-wider mb-3";
+                badge.innerHTML = "🏆 MISSION COMPLETE";
+            } else {
+                badge.className = "inline-block px-4 py-1.5 bg-rose-950/60 border border-rose-500/30 rounded-full text-xs font-bold text-rose-400 tracking-wider mb-3";
+                badge.innerHTML = "💥 SHIP DESTROYED";
+            }
+
+            scoreDisp.innerText = gameScore;
+            
+            const maxProblems = problemList.length;
+            const wrongCount = maxProblems - Math.floor(gameScore / 100);
+            const correctCount = Math.floor(gameScore / 100);
+
+            statCorrect.innerText = `${correctCount} 개`;
+            statWrong.innerText = `${Math.max(0, wrongCount)} 개`;
+        }
+
+        // 게임 포기하기
+        function exitGameConfirm() {
+            showCustomConfirm("정말 현재 영어 비행을 포기하고 기지로 복귀할까요?", () => {
+                gameActive = false;
+                if (animationFrameId) cancelAnimationFrame(animationFrameId);
+                showLobby();
+            });
+        }
+
+        function showLobby() {
+            document.getElementById('gamePlayScreen').classList.add('hidden');
+            document.getElementById('resultScreen').classList.add('hidden');
+            document.getElementById('lobbyScreen').classList.remove('hidden');
+            updateWrongCountUi();
+        }
+
+        // ----------------------------------------------------
+        // 오답 복습소 제어판
+        // ----------------------------------------------------
+        function openIncorrectNote() {
+            const modal = document.getElementById('incorrectNoteModal');
+            const listArea = document.getElementById('incorrectListArea');
+            
+            listArea.innerHTML = '';
+            
+            if (incorrectWords.length === 0) {
+                listArea.innerHTML = `
+                    <div class="text-center text-gray-500 py-16 text-sm">
+                        <i class="fa-solid fa-graduation-cap text-4xl mb-3 text-cyan-400 block animate-bounce"></i>
+                        틀린 오답이 한 개도 없습니다!<br>완벽하게 정복하셨습니다.
+                    </div>
+                `;
+                document.getElementById('btnPracticeWrong').disabled = true;
+                document.getElementById('btnPracticeWrong').style.opacity = '0.5';
+            } else {
+                document.getElementById('btnPracticeWrong').disabled = false;
+                document.getElementById('btnPracticeWrong').style.opacity = '1';
+                
+                incorrectWords.forEach((wordObj, index) => {
+                    const card = document.createElement('div');
+                    card.className = "p-3 bg-slate-900/90 rounded-xl border border-rose-900/30 flex items-center justify-between";
+                    card.innerHTML = `
+                        <div class="flex-1">
+                            <span class="text-[10px] text-rose-400 block font-semibold">ERROR NOTE #${index + 1}</span>
+                            <span class="text-lg font-bold font-orbitron text-white uppercase tracking-wide">${wordObj.word}</span>
+                            <p class="text-xs text-gray-300 mt-0.5">${wordObj.meaning}</p>
+                        </div>
+                        <button onclick="deleteIncorrectWord(${wordObj.id})" class="text-gray-500 hover:text-rose-400 p-2 text-sm transition-colors">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    `;
+                    listArea.appendChild(card);
+                });
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeIncorrectNote() {
+            document.getElementById('incorrectNoteModal').classList.add('hidden');
+        }
+
+        function deleteIncorrectWord(wordId) {
+            incorrectWords = incorrectWords.filter(w => w.id !== wordId);
+            saveIncorrectNotesLocally();
+            openIncorrectNote();
+        }
+
+        function clearAllIncorrect() {
+            showCustomConfirm("정말 오답 데이터를 완전히 포맷하시겠습니까?", () => {
+                incorrectWords = [];
+                saveIncorrectNotesLocally();
+                openIncorrectNote();
+            });
+        }
+
+        // ----------------------------------------------------
+        // 커스텀 알림/컨펌창 우회 모듈 (iframe 에러 및 모바일 방지)
+        // ----------------------------------------------------
+        let confirmAction = null;
+        function showCustomAlert(message) {
+            document.getElementById('customAlertMessage').innerText = message;
+            document.getElementById('customAlertCancel').classList.add('hidden');
+            document.getElementById('customAlertModal').classList.remove('hidden');
+            confirmAction = null;
+        }
+
+        function showCustomConfirm(message, action) {
+            document.getElementById('customAlertMessage').innerText = message;
+            document.getElementById('customAlertCancel').classList.remove('hidden');
+            document.getElementById('customAlertModal').classList.remove('hidden');
+            confirmAction = action;
+        }
+
+        function closeCustomAlert() {
+            document.getElementById('customAlertModal').classList.add('hidden');
+        }
+
+        function closeCustomAlertAndConfirm() {
+            document.getElementById('customAlertModal').classList.add('hidden');
+            if (confirmAction) {
+                confirmAction();
+                confirmAction = null;
+            }
+        }
+
+        window.closeCustomAlert = function() {
+            document.getElementById('customAlertModal').classList.add('hidden');
+            if (confirmAction) {
+                confirmAction();
+                confirmAction = null;
+            }
+        }
+    </script>
+</body>
+</html>
